@@ -4,7 +4,7 @@ import click
 import os
 import sqlite3
 import sys
-
+https://prod.liveshare.vsengsaas.visualstudio.com/join?72166E35889BE5AC54BB882589A98E1CA8B2
 DB_FILE = 'network.db'
 
 def getdb(create=False):
