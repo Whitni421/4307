@@ -19,27 +19,27 @@ CREATE TABLE Posts (
     FOREIGN KEY (posterId) REFERENCES Accounts(userId)
 );
 
+CREATE TABLE Likes (
+    id          INTEGER PRIMARY KEY,
+    userId      INTEGER NOT NULL,
+    postId      INTEGER NOT NULL,
+    FOREIGN KEY (userId) REFERENCES Accounts(userId) ON DELETE CASCADE,
+    FOREIGN KEY (postId) REFERENCES Posts(id) ON DELETE CASCADE
+);
+
 CREATE TABLE Comments (
     id          INTEGER PRIMARY KEY,
     textBody    TEXT NOT NULL,
     commenterId INTEGER NOT NULL,
     postId      INTEGER NOT NULL,
-    FOREIGN KEY (commenterId) REFERENCES Accounts(userId),
-    FOREIGN KEY (postId) REFERENCES Posts(id)
-);
-
-CREATE TABLE Likes (
-    id          INTEGER PRIMARY KEY,
-    userId      INTEGER NOT NULL,
-    postId      INTEGER NOT NULL,
-    FOREIGN KEY (userId) REFERENCES Accounts(userId),
-    FOREIGN KEY (postId) REFERENCES Posts(id)
+    FOREIGN KEY (commenterId) REFERENCES Accounts(userId) ON DELETE CASCADE,
+    FOREIGN KEY (postId) REFERENCES Posts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE Follows (
     id          INTEGER PRIMARY KEY,
     followerId  INTEGER NOT NULL,
     followeeId  INTEGER NOT NULL,
-    FOREIGN KEY (followerId) REFERENCES Accounts(userId),
-    FOREIGN KEY (followeeId) REFERENCES Accounts(userId)
+    FOREIGN KEY (followerId) REFERENCES Accounts(userId) ON DELETE CASCADE,
+    FOREIGN KEY (followeeId) REFERENCES Accounts(userId) ON DELETE CASCADE
 );

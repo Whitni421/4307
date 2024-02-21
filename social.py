@@ -87,6 +87,7 @@ def createpost(username, title, content):
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
 
+
 @click.command()
 @click.argument('username')
 def feed(username):
@@ -127,17 +128,30 @@ def myposts(username):
 @click.command()
 @click.argument('username')
 @click.argument('postid')
-def deletePost(username, postid):
+def deletepost(username, postid):
     print('Deleting post:', postid, 'for user:', username)
-    cursor.execute('''SELECT userName FROM Accounts WHERE userId = (SELECT * From Posts WHERE id = ?)''', (postid,))
-    userName  = cursor.fetchone()
-    if userName is userName:
-        print('This is not your post')
-        return
+    
     with getdb() as con:
         cursor = con.cursor()
-        cursor.execute('''DELETE FROM Posts WHERE id = ? AND posterId = (SELECT id FROM accounts WHERE userName = ?)''', (postid, username))
+
+        cursor.execute('''
+            SELECT id FROM Posts WHERE id = ? AND posterId = (
+                SELECT id FROM Accounts WHERE userName = ?
+            )
+        ''', (postid, username))
+        post = cursor.fetchone()
+        if post is None:
+            print('This is not your post')
+            return
+
+        cursor.execute('DELETE FROM Likes WHERE postId = ?', (postid,))
+        cursor.execute('DELETE FROM Comments WHERE postId = ?', (postid,))
+        cursor.execute('DELETE FROM Follows WHERE followeeId = ?', (postid,))
+
+        cursor.execute('DELETE FROM Posts WHERE id = ?', (postid,))
         print('Deleted successfully.')
+
+
 @click.command()
 @click.argument('username')
 @click.argument('followusername')
@@ -243,7 +257,7 @@ cli.add_command(searchuser)
 cli.add_command(unfollow)
 cli.add_command(listfollows)
 cli.add_command(myposts)
-cli.add_command(deletePost)
+cli.add_command(deletepost)
 cli.add_command(like)
 
 
