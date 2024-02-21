@@ -7,7 +7,7 @@ CREATE TABLE Users (
 CREATE TABLE Accounts(
     id          INTEGER PRIMARY KEY,
     userName    TEXT NOT NULL,
-    user_id     INTEGER NOT NULL,
+    user_id     INTEGER NOT NULL
 );
 
 CREATE TABLE Posts (
