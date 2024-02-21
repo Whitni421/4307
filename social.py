@@ -64,7 +64,7 @@ def addaccount(email, username):
      with getdb() as con:
         print('Creating account with username:', username, 'for email:', email)
         cursor = con.cursor()
-        cursor.execute('''INSERT INTO Accounts (user_id, username)
+        cursor.execute('''INSERT INTO Accounts (userId, userName)
                         VALUES ((SELECT id FROM Users WHERE email = ?), ?)''', (email, username))
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
@@ -90,22 +90,31 @@ def createpost(username, title, content):
 @click.command()
 @click.argument('username')
 def feed(username):
-    print('Listing posts for user:', username)
+    print('Listing Feed for user:', username)
 
     with getdb() as con:
         cursor = con.cursor()
         cursor.execute('''
-                       SELECT DISTINCT Posts.*
+                       SELECT DISTINCT Posts.*, count(Likes.postId) as likes , Accounts.userName
                        FROM Follows
                        LEFT JOIN Posts ON Follows.followeeId = Posts.posterId
-                        WHERE followerId = (SELECT id FROM accounts WHERE userName = ?)
+                       LEFT JOIN Likes On Posts.id = Likes.postId
+                       LEFT JOIN Accounts ON Posts.posterId = Accounts.userId
+                       WHERE followerId = (SELECT userId FROM accounts WHERE userName = ?)
+                       GROUP BY Posts.id
                        ''', (username,))
         rows = cursor.fetchall()
         for row in rows:
-            print(row)
+            print(f"""UserName: {row[6]}
+Id: {row[0]}
+Title: {row[1]}
+TextBody: {row[2]}
+Date: {row[3]}
+Likes: {row[5]}
+            """)
 @click.command()
 @click.argument('username')
-def myPosts(username):
+def myposts(username):
     print('Listing posts for user:', username)
 
     with getdb() as con:
@@ -147,9 +156,17 @@ def follow(username, followusername):
             return
         print('Following user:', username, 'with id:', followusername)
         cursor.execute('''INSERT INTO Follows (followerId, followeeId)
-                        VALUES ((SELECT user_id FROM accounts WHERE username = ?), (SELECT user_id FROM accounts WHERE username = ?))''', (username, followusername))
+                        VALUES ((SELECT userId FROM accounts WHERE username = ?), (SELECT userId FROM accounts WHERE username = ?))''', (username, followusername))
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
+        cursor.execute('''SELECT DISTINCT  * FROM Follows
+                       LEFT JOIN Accounts ON Follows.followeeId = Accounts.userId
+                        WHERE followeeId = (SELECT userId FROM accounts WHERE username = ?)
+                        LIMIT 10 ''', (followusername,))
+        rows = cursor.fetchall()
+        print('Suggested users to follow:')
+        for row in rows:
+            print('''UserName: {row[1]} UserId: {row[2]} ''')
 
 @click.command()
 @click.argument('username')
@@ -168,7 +185,7 @@ def unfollow(username, unfollowusername):
             return
         print('Unfollowing user:', username, 'with id:', unfollowusername)
         cursor.execute('''DELETE FROM Follows WHERE followerId = (SELECT id FROM accounts WHERE username = ?) 
-                          AND followeeId = (SELECT user_id FROM accounts WHERE username = ?)''', (username, unfollowusername))
+                          AND followeeId = (SELECT userId FROM accounts WHERE username = ?)''', (username, unfollowusername))
         print('Unfollowed successfully.')
 
 @click.command()
@@ -179,8 +196,8 @@ def listfollows(username):
         cursor = con.cursor()
         cursor.execute('''SELECT Accounts.userName
                         FROM Follows
-                        LEFT JOIN Accounts ON Follows.followeeId = Accounts.user_id
-                        WHERE Follows.followerId = (SELECT user_id FROM accounts WHERE userName = ?)''', (username,))
+                        LEFT JOIN Accounts ON Follows.followeeId = Accounts.userId
+                        WHERE Follows.followerId = (SELECT userId FROM accounts WHERE userName = ?)''', (username,))
         rows = cursor.fetchall()
         for row in rows:
             print(row)
@@ -197,6 +214,24 @@ def searchuser(searchuser):
         print('Found the following users:')
         for row in rows:
             print(row)
+    
+
+@click.command()
+@click.argument('username')
+@click.argument('postid')
+def like(username, postid):
+    print('Liking post:', postid, 'for user:', username)
+    with getdb() as con:
+        cursor = con.cursor()
+        cursor.execute('''SELECT * FROM Likes WHERE postId = ? AND userId = (SELECT id FROM Accounts WHERE userName = ?)''', (postid, username))
+        row = cursor.fetchone()
+        if row is not None:
+            print('You have already liked this post.')
+            return
+        cursor.execute('''INSERT INTO Likes (postId, userId)
+                        VALUES (?, (SELECT id FROM Accounts WHERE userName = ?))''', (postid, username))
+        id = cursor.lastrowid
+        print(f'Inserted with id={id}')
 # Adding commands to the click group
 cli.add_command(feed)
 cli.add_command(create)
@@ -207,6 +242,9 @@ cli.add_command(follow)
 cli.add_command(searchuser)
 cli.add_command(unfollow)
 cli.add_command(listfollows)
+cli.add_command(myposts)
+cli.add_command(deletePost)
+cli.add_command(like)
 
 
 cli()
