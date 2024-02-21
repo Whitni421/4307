@@ -29,6 +29,14 @@ CREATE TABLE Likes (
 
 CREATE TABLE Comments (
     id          INTEGER PRIMARY KEY,
+    userId      INTEGER NOT NULL,
+    postId      INTEGER NOT NULL,
+    FOREIGN KEY (userId) REFERENCES Accounts(userId) ON DELETE CASCADE,
+    FOREIGN KEY (postId) REFERENCES Posts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE Comments (
+    id          INTEGER PRIMARY KEY,
     textBody    TEXT NOT NULL,
     commenterId INTEGER NOT NULL,
     postId      INTEGER NOT NULL,

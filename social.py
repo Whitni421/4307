@@ -96,23 +96,32 @@ def feed(username):
     with getdb() as con:
         cursor = con.cursor()
         cursor.execute('''
-                       SELECT DISTINCT Posts.*, count(Likes.postId) as likes , Accounts.userName
-                       FROM Follows
-                       LEFT JOIN Posts ON Follows.followeeId = Posts.posterId
-                       LEFT JOIN Likes On Posts.id = Likes.postId
-                       LEFT JOIN Accounts ON Posts.posterId = Accounts.userId
-                       WHERE followerId = (SELECT userId FROM accounts WHERE userName = ?)
-                       GROUP BY Posts.id
-                       ''', (username,))
+            SELECT DISTINCT Posts.*, COUNT(Likes.postId) AS likes, Accounts.userName,
+            GROUP_CONCAT(Comments.textBody, ', ') AS comments
+            FROM Posts
+            LEFT JOIN Likes ON Posts.id = Likes.postId
+            LEFT JOIN Accounts ON Posts.posterId = Accounts.userId
+            LEFT JOIN Comments ON Posts.id = Comments.postId
+            WHERE Posts.posterId IN (
+                SELECT followeeId FROM Follows WHERE followerId = (
+                    SELECT userId FROM Accounts WHERE userName = ?
+                )
+            )
+            GROUP BY Posts.id
+        ''', (username,))
         rows = cursor.fetchall()
         for row in rows:
-            print(f"""UserName: {row[6]}
-Id: {row[0]}
-Title: {row[1]}
-TextBody: {row[2]}
-Date: {row[3]}
-Likes: {row[5]}
+            print(f"""
+                UserName: {row[6]}
+                Id: {row[0]}
+                Title: {row[1]}
+                TextBody: {row[2]}
+                Date: {row[3]}
+                Likes: {row[5]}
+                Comments: {row[7]}
             """)
+
+
 @click.command()
 @click.argument('username')
 def myposts(username):
@@ -246,6 +255,27 @@ def like(username, postid):
                         VALUES (?, (SELECT id FROM Accounts WHERE userName = ?))''', (postid, username))
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
+
+
+@click.command()
+@click.argument('username')
+@click.argument('postid')
+@click.argument('comment')
+def comment(username, postid, comment):
+    print('Commenting on post:', postid, 'for user:', username, 'comment:', comment)
+    with getdb() as con:
+        cursor = con.cursor()
+        cursor.execute('''SELECT * FROM Likes WHERE postId = ? AND userId = (SELECT id FROM Accounts WHERE userName = ?)''', (postid, username))
+        row = cursor.fetchone()
+        if row is None:
+            print('You can only comment on posts that you have liked.')
+            return
+        cursor.execute('''INSERT INTO Comments (textBody, commenterId, postId)
+                        VALUES (?, (SELECT id FROM Accounts WHERE userName = ?), ?)''', (comment, username, postid))
+        id = cursor.lastrowid
+        print(f'Inserted with id={id}')
+
+
 # Adding commands to the click group
 cli.add_command(feed)
 cli.add_command(create)
@@ -259,6 +289,7 @@ cli.add_command(listfollows)
 cli.add_command(myposts)
 cli.add_command(deletepost)
 cli.add_command(like)
+cli.add_command(comment)
 
 
 cli()
