@@ -97,11 +97,17 @@ def feed(username):
         cursor = con.cursor()
         cursor.execute('''
             SELECT DISTINCT Posts.*, COUNT(Likes.postId) AS likes, Accounts.userName,
-            GROUP_CONCAT(Comments.textBody, ', ') AS comments
+            cAC.userName,
+            c.comments
             FROM Posts
             LEFT JOIN Likes ON Posts.id = Likes.postId
             LEFT JOIN Accounts ON Posts.posterId = Accounts.userId
-            LEFT JOIN Comments ON Posts.id = Comments.postId
+            LEFT JOIN (
+                SELECT Comments.postId,cAc.userName, GROUP_CONCAT(Comments.textBody, ', ') AS comments
+                FROM Comments
+                LEFT JOIN Accounts AS cAc ON Comments.userId = cAc.userId
+                GROUP BY Comments.postId
+            ) AS c ON Posts.id = c.postId
             WHERE Posts.posterId IN (
                 SELECT followeeId FROM Follows WHERE followerId = (
                     SELECT userId FROM Accounts WHERE userName = ?
@@ -179,13 +185,15 @@ def follow(username, followusername):
             return
         print('Following user:', username, 'with id:', followusername)
         cursor.execute('''INSERT INTO Follows (followerId, followeeId)
-                        VALUES ((SELECT userId FROM accounts WHERE username = ?), (SELECT userId FROM accounts WHERE username = ?))''', (username, followusername))
+                  VALUES ((SELECT id FROM Accounts WHERE userName = ?),
+                          (SELECT id FROM Accounts WHERE userName = ?))''', (username, followusername))
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
-        cursor.execute('''SELECT DISTINCT  * FROM Follows
-                       LEFT JOIN Accounts ON Follows.followeeId = Accounts.userId
-                        WHERE followeeId = (SELECT userId FROM accounts WHERE username = ?)
-                        LIMIT 10 ''', (followusername,))
+        cursor.execute('''SELECT DISTINCT Accounts.userName, Accounts.id
+                        FROM Follows
+                        JOIN Accounts ON Follows.followeeId = Accounts.id
+                        WHERE Follows.followeeId = (SELECT id FROM Accounts WHERE userName = ?)
+                        LIMIT 10''', (followusername,))
         rows = cursor.fetchall()
         print('Suggested users to follow:')
         for row in rows:

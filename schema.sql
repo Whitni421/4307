@@ -15,8 +15,8 @@ CREATE TABLE Posts (
     title       TEXT NOT NULL,
     textBody    TEXT NOT NULL,
     date        dateTime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    posterId    INTEGER NOT NULL,
-    FOREIGN KEY (posterId) REFERENCES Accounts(userId)
+    posterId    INTEGER NOT NULL
+    -- FOREIGN KEY (posterId) REFERENCES Accounts(userId)
 );
 
 CREATE TABLE Likes (
@@ -49,5 +49,5 @@ CREATE TABLE Follows (
     followerId  INTEGER NOT NULL,
     followeeId  INTEGER NOT NULL,
     FOREIGN KEY (followerId) REFERENCES Accounts(userId) ON DELETE CASCADE,
-    FOREIGN KEY (followeeId) REFERENCES Accounts(userId) ON DELETE CASCADE
+    FOREIGN KEY (followeeId) REFERENCES Accounts(userId)
 );
