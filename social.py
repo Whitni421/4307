@@ -58,8 +58,8 @@ def adduser(name, email):
         print(f'Inserted with id={id}')
 
 @click.command()
-@click.argument('email')
 @click.argument('username')
+@click.argument('email')
 def addaccount(email, username):
      with getdb() as con:
         print('Creating account with username:', username, 'for email:', email)
@@ -86,6 +86,8 @@ def createpost(username, title, content):
                         VALUES ((SELECT id FROM accounts WHERE username = ?), ?, ?)''', (username, title, content))
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
+        return id
+
 
 
 @click.command()
@@ -96,24 +98,24 @@ def feed(username):
     with getdb() as con:
         cursor = con.cursor()
         cursor.execute('''
-            SELECT DISTINCT Posts.*, COUNT(Likes.postId) AS likes, Accounts.userName,
-            cAC.userName,
-            c.comments
-            FROM Posts
-            LEFT JOIN Likes ON Posts.id = Likes.postId
-            LEFT JOIN Accounts ON Posts.posterId = Accounts.userId
-            LEFT JOIN (
-                SELECT Comments.postId,cAc.userName, GROUP_CONCAT(Comments.textBody, ', ') AS comments
-                FROM Comments
-                LEFT JOIN Accounts AS cAc ON Comments.userId = cAc.userId
-                GROUP BY Comments.postId
-            ) AS c ON Posts.id = c.postId
-            WHERE Posts.posterId IN (
-                SELECT followeeId FROM Follows WHERE followerId = (
-                    SELECT userId FROM Accounts WHERE userName = ?
+                SELECT DISTINCT Posts.*, COUNT(Likes.postId) AS likes, Accounts.userName,
+                GROUP_CONCAT(c.combined_comments) AS comments
+                FROM Posts
+                LEFT JOIN Likes ON Posts.id = Likes.postId
+                LEFT JOIN Accounts ON Posts.posterId = Accounts.userId
+                LEFT JOIN (
+                    SELECT Comments.postId, GROUP_CONCAT(cAc.userName || ': ' || Comments.textBody, ', ') AS combined_comments
+                    FROM Comments
+                    JOIN Accounts AS cAc ON Comments.commenterId = cAc.userId
+                    GROUP BY Comments.postId
+                ) AS c ON Posts.id = c.postId
+                WHERE Posts.posterId IN (
+                    SELECT followeeId FROM Follows WHERE followerId = (
+                        SELECT id FROM Accounts WHERE userName = ?
+                    )
                 )
-            )
-            GROUP BY Posts.id
+                GROUP BY Posts.id
+
         ''', (username,))
         rows = cursor.fetchall()
         for row in rows:
@@ -183,21 +185,20 @@ def follow(username, followusername):
         if followId is None:
             print('followee does not exist.')
             return
-        print('Following user:', username, 'with id:', followusername)
-        cursor.execute('''INSERT INTO Follows (followerId, followeeId)
-                  VALUES ((SELECT id FROM Accounts WHERE userName = ?),
-                          (SELECT id FROM Accounts WHERE userName = ?))''', (username, followusername))
+        print('Following user:', followusername, 'with id:', username)
+        cursor = con.cursor()
+        cursor.execute('''INSERT INTO Follows (followerId, followeeId) VALUES ((SELECT id FROM Accounts WHERE userName = ?), (SELECT id FROM Accounts WHERE userName = ?))''', (username, followusername))
         id = cursor.lastrowid
         print(f'Inserted with id={id}')
         cursor.execute('''SELECT DISTINCT Accounts.userName, Accounts.id
                         FROM Follows
-                        JOIN Accounts ON Follows.followeeId = Accounts.id
+                        JOIN Accounts ON Follows.followerId = Accounts.id
                         WHERE Follows.followeeId = (SELECT id FROM Accounts WHERE userName = ?)
                         LIMIT 10''', (followusername,))
         rows = cursor.fetchall()
         print('Suggested users to follow:')
         for row in rows:
-            print('''UserName: {row[1]} UserId: {row[2]} ''')
+            print(f'UserName: {row[0]} UserId: {row[1]} ')
 
 @click.command()
 @click.argument('username')
@@ -273,11 +274,11 @@ def comment(username, postid, comment):
     print('Commenting on post:', postid, 'for user:', username, 'comment:', comment)
     with getdb() as con:
         cursor = con.cursor()
-        cursor.execute('''SELECT * FROM Likes WHERE postId = ? AND userId = (SELECT id FROM Accounts WHERE userName = ?)''', (postid, username))
-        row = cursor.fetchone()
-        if row is None:
-            print('You can only comment on posts that you have liked.')
-            return
+        # cursor.execute('''SELECT * FROM Likes WHERE postId = ? AND userId = (SELECT id FROM Accounts WHERE userName = ?)''', (postid, username))
+        # row = cursor.fetchone()
+        # if row is None:
+        #     print('You can only comment on posts that you have liked.')
+        #     return
         cursor.execute('''INSERT INTO Comments (textBody, commenterId, postId)
                         VALUES (?, (SELECT id FROM Accounts WHERE userName = ?), ?)''', (comment, username, postid))
         id = cursor.lastrowid
